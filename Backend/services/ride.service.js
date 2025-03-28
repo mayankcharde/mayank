@@ -1,8 +1,9 @@
 const rideModel = require('../models/ride.model');
 const mapService = require('./maps.service');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const captainModel = require('../models/captain.model');
+const jwt = require('jsonwebtoken');
 
 async function getFare(pickup, destination) {
     try {
