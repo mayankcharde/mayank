@@ -16,23 +16,46 @@ const paymentRoutes = require('./routes/payment.routes');
 connectToDb();
 
 // CORS Configuration
+const allowedOrigins = [
+    'https://beamish-alpaca-78bc5e.netlify.app',
+    'https://mayank-3-r4nh.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:5174'
+];
+
 const corsOptions = {
-    origin: process.env.NODE_ENV === 'production'
-        ? [
-            'https://ride-sharing-frontend.onrender.com',
-            'https://ride-sharing-app.onrender.com',
-            process.env.FRONTEND_URL
-          ].filter(Boolean)
-        : ['http://localhost:5173', 'http://localhost:5174'],
+    origin: function(origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) {
+            return callback(null, true);
+        }
+        if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    maxAge: 600 // 10 minutes
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+    maxAge: 86400 // 24 hours
 };
 
 // Middleware
 app.use(cors(corsOptions));
+
+// Additional headers for CORS
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Credentials', true);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -55,7 +78,11 @@ app.get('/health', (req, res) => {
         status: 'ok', 
         message: 'Server is running',
         environment: process.env.NODE_ENV,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        cors: {
+            allowedOrigins,
+            currentOrigin: req.headers.origin
+        }
     });
 });
 
@@ -71,7 +98,8 @@ app.use((req, res) => {
     res.status(404).json({ 
         message: 'Route not found',
         path: req.path,
-        method: req.method
+        method: req.method,
+        origin: req.headers.origin
     });
 });
 
@@ -86,7 +114,7 @@ app.use((err, req, res, next) => {
             path: req.path,
             method: req.method,
             origin: req.headers.origin,
-            allowedOrigins: corsOptions.origin
+            allowedOrigins
         });
     }
 
@@ -94,6 +122,7 @@ app.use((err, req, res, next) => {
         message: err.message || 'Internal Server Error',
         path: req.path,
         method: req.method,
+        origin: req.headers.origin,
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 });
