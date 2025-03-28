@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: ride-sharing-backend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 16.x
+    healthCheckPath: /
+    autoDeploy: true 
