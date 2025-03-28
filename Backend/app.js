@@ -17,9 +17,21 @@ connectToDb();
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: function(origin, callback) {
+        const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
+        if (process.env.FRONTEND_URL) {
+            allowedOrigins.push(process.env.FRONTEND_URL);
+        }
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -27,9 +39,19 @@ app.use(cookieParser());
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Root route
+app.get('/', (req, res) => {
+    res.status(200).json({ message: 'Welcome to the API' });
+});
+
 // Health check route
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', message: 'Server is running' });
+    res.status(200).json({ 
+        status: 'ok', 
+        message: 'Server is running',
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+    });
 });
 
 // API Routes
@@ -41,14 +63,20 @@ app.use('/api/payments', paymentRoutes);
 
 // 404 handler
 app.use((req, res) => {
-    res.status(404).json({ message: 'Route not found' });
+    res.status(404).json({ 
+        message: 'Route not found',
+        path: req.path,
+        method: req.method
+    });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-    console.error(err.stack);
+    console.error('Error:', err);
     res.status(err.status || 500).json({
         message: err.message || 'Internal Server Error',
+        path: req.path,
+        method: req.method,
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 });
