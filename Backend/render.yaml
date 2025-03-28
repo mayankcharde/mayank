@@ -21,6 +21,8 @@ services:
         value: production
       - key: PORT
         value: 10000
+      - key: CORS_ORIGIN
+        sync: false
     healthCheckPath: /health
     autoDeploy: true
     disk:

@@ -15,23 +15,24 @@ const paymentRoutes = require('./routes/payment.routes');
 // Connect to database
 connectToDb();
 
-// Middleware
-app.use(cors({
-    origin: function(origin, callback) {
-        const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174'];
-        if (process.env.FRONTEND_URL) {
-            allowedOrigins.push(process.env.FRONTEND_URL);
-        }
-        // Allow requests with no origin (like mobile apps or curl requests)
-        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-            callback(null, true);
-        } else {
-            callback(new Error('Not allowed by CORS'));
-        }
-    },
-    credentials: true
-}));
+// CORS Configuration
+const corsOptions = {
+    origin: process.env.NODE_ENV === 'production'
+        ? [
+            'https://ride-sharing-frontend.onrender.com',
+            'https://ride-sharing-app.onrender.com',
+            process.env.FRONTEND_URL
+          ].filter(Boolean)
+        : ['http://localhost:5173', 'http://localhost:5174'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    maxAge: 600 // 10 minutes
+};
 
+// Middleware
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -41,7 +42,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Root route
 app.get('/', (req, res) => {
-    res.status(200).json({ message: 'Welcome to the API' });
+    res.status(200).json({ 
+        message: 'Welcome to the API',
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString()
+    });
 });
 
 // Health check route
@@ -73,6 +78,18 @@ app.use((req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
     console.error('Error:', err);
+    
+    // Handle CORS errors specifically
+    if (err.message === 'Not allowed by CORS') {
+        return res.status(403).json({
+            message: 'CORS Error: Origin not allowed',
+            path: req.path,
+            method: req.method,
+            origin: req.headers.origin,
+            allowedOrigins: corsOptions.origin
+        });
+    }
+
     res.status(err.status || 500).json({
         message: err.message || 'Internal Server Error',
         path: req.path,
